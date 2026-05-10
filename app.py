@@ -207,7 +207,7 @@ def index():
 
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe():
-    api_key = request.headers.get('X-API-Key', '').strip()
+    api_key = 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
     if not api_key:
         return jsonify({"error": "Missing Groq API key"}), 401
 
