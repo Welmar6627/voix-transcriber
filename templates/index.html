@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOIX — Audio Transcription</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0f0e17;
+    --paper: #f5f0e8;
+    --cream: #ede8dc;
+    --accent: #e84855;
+    --accent2: #3a86ff;
+    --gold: #c9a84c;
+    --muted: #8a8478;
+    --success: #2d9e5f;
+    --border: rgba(15,14,23,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(circle at 80% 20%, rgba(232,72,85,0.06) 0%, transparent 50%),
+      radial-gradient(circle at 20% 80%, rgba(58,134,255,0.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── HEADER ── */
+  header {
+    padding: 48px 0 36px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .logo-wrap {}
+
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 40px;
+    letter-spacing: -1px;
+    line-height: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .logo-accent { color: var(--accent); }
+
+  .logo-dot {
+    width: 7px; height: 7px;
+    background: var(--accent);
+    border-radius: 50%;
+    margin-bottom: 3px;
+    align-self: flex-end;
+  }
+
+  .tagline {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 300;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  .groq-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 6px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--success);
+  }
+
+  .groq-badge-dot {
+    width: 6px; height: 6px;
+    background: var(--success);
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(45,158,95,0.5);
+  }
+
+  /* ── API KEY ── */
+  .api-section {
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 28px;
+  }
+
+  .api-top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .api-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .api-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--ink);
+    min-width: 0;
+  }
+
+  .api-input::placeholder { color: var(--muted); opacity: 0.5; }
+
+  .api-status {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    opacity: 0.3;
+    flex-shrink: 0;
+    transition: all 0.3s;
+  }
+
+  .api-status.active {
+    background: var(--success);
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(45,158,95,0.4);
+  }
+
+  .api-hint {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .api-hint a {
+    color: var(--accent2);
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .api-hint a:hover { text-decoration: underline; }
+
+  /* ── DROP ZONE ── */
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 56px 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    background: rgba(255,255,255,0.5);
+    margin-bottom: 24px;
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    border-style: solid;
+    background: rgba(232,72,85,0.03);
+    transform: scale(1.005);
+  }
+
+  .waveform-bars {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3px;
+    height: 28px;
+    margin: 0 auto 20px;
+    width: 80px;
+  }
+
+  .bar {
+    width: 4px;
+    background: var(--accent);
+    opacity: 0.3;
+    border-radius: 2px;
+  }
+
+  .bar:nth-child(1) { height: 40%; }
+  .bar:nth-child(2) { height: 70%; }
+  .bar:nth-child(3) { height: 100%; }
+  .bar:nth-child(4) { height: 55%; }
+  .bar:nth-child(5) { height: 80%; }
+  .bar:nth-child(6) { height: 45%; }
+  .bar:nth-child(7) { height: 65%; }
+
+  .drop-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    margin-bottom: 6px;
+  }
+
+  .drop-sub {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .drop-formats {
+    display: inline-flex;
+    gap: 6px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .format-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    background: var(--cream);
+    border: 1px solid var(--border);
+    padding: 3px 10px;
+    border-radius: 100px;
+    color: var(--muted);
+  }
+
+  /* ── FILE PREVIEW ── */
+  .file-preview {
+    display: none;
+    align-items: center;
+    gap: 14px;
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+  }
+
+  .file-preview.show { display: flex; }
+
+  .file-icon {
+    width: 40px; height: 40px;
+    background: var(--accent);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .file-icon svg {
+    width: 20px; height: 20px;
+    stroke: white; stroke-width: 1.5; fill: none;
+  }
+
+  .file-info { flex: 1; min-width: 0; }
+
+  .file-name {
+    font-weight: 500;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .file-size {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .file-remove {
+    cursor: pointer;
+    color: var(--muted);
+    background: none;
+    border: none;
+    padding: 4px;
+    border-radius: 6px;
+    transition: color 0.2s;
+    line-height: 1;
+  }
+
+  .file-remove:hover { color: var(--accent); }
+
+  /* ── ERROR ── */
+  .error-box {
+    display: none;
+    background: rgba(232,72,85,0.06);
+    border: 1px solid rgba(232,72,85,0.25);
+    border-radius: 10px;
+    padding: 14px 18px;
+    color: var(--accent);
+    font-size: 13px;
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+
+  .error-box.show { display: block; }
+
+  /* ── BUTTON ── */
+  .btn-transcribe {
+    width: 100%;
+    padding: 18px;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: 12px;
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 36px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-transcribe::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(232,72,85,0.15) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .btn-transcribe:hover:not(:disabled)::after { opacity: 1; }
+  .btn-transcribe:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(15,14,23,0.2); }
+  .btn-transcribe:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── PROGRESS ── */
+  .progress-section { display: none; margin-bottom: 36px; }
+  .progress-section.show { display: block; }
+
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .progress-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .progress-pct {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+  }
+
+  .progress-bar-track {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+
+  .progress-msg {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  .dots::after {
+    content: '';
+    animation: dots 1.4s infinite;
+  }
+
+  @keyframes dots {
+    0% { content: ''; }
+    33% { content: '.'; }
+    66% { content: '..'; }
+    100% { content: '...'; }
+  }
+
+  /* ── RESULT ── */
+  .result-section { display: none; margin-bottom: 48px; }
+  .result-section.show { display: block; animation: fadeUp 0.4s ease; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .result-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 24px;
+  }
+
+  .result-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .meta-pill {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    background: var(--cream);
+    border: 1px solid var(--border);
+    padding: 4px 12px;
+    border-radius: 100px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .meta-pill.lang {
+    color: var(--success);
+    border-color: rgba(45,158,95,0.3);
+    background: rgba(45,158,95,0.06);
+  }
+
+  .result-box {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px 32px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-size: 15px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-shadow: inset 0 2px 8px rgba(15,14,23,0.03);
+    margin-bottom: 18px;
+  }
+
+  .result-box::-webkit-scrollbar { width: 5px; }
+  .result-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── DOWNLOAD ── */
+  .download-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .btn-download {
+    flex: 1; min-width: 130px;
+    padding: 13px 18px;
+    border-radius: 10px;
+    border: 1.5px solid var(--border);
+    background: white;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    color: var(--ink);
+  }
+
+  .btn-download svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 1.5; fill: none; }
+  .btn-download:hover { border-color: var(--accent); color: var(--accent); background: rgba(232,72,85,0.04); transform: translateY(-1px); }
+  .btn-download.pdf:hover { border-color: var(--accent2); color: var(--accent2); background: rgba(58,134,255,0.04); }
+
+  .btn-new {
+    flex: 1; min-width: 130px;
+    padding: 13px 18px;
+    border-radius: 10px;
+    border: 1.5px solid var(--ink);
+    background: var(--ink);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    color: var(--paper);
+  }
+
+  .btn-new:hover { background: var(--accent); border-color: var(--accent); transform: translateY(-1px); }
+
+  /* ── SPINNER ── */
+  .spinner {
+    display: inline-block;
+    width: 15px; height: 15px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .processing .bar {
+    animation: wave 1.1s ease-in-out infinite;
+    opacity: 0.7;
+  }
+
+  .processing .bar:nth-child(1) { animation-delay: 0s; }
+  .processing .bar:nth-child(2) { animation-delay: 0.1s; }
+  .processing .bar:nth-child(3) { animation-delay: 0.2s; }
+  .processing .bar:nth-child(4) { animation-delay: 0.3s; }
+  .processing .bar:nth-child(5) { animation-delay: 0.4s; }
+  .processing .bar:nth-child(6) { animation-delay: 0.3s; }
+  .processing .bar:nth-child(7) { animation-delay: 0.2s; }
+
+  @keyframes wave {
+    0%, 100% { transform: scaleY(0.4); }
+    50% { transform: scaleY(1); }
+  }
+
+  footer {
+    text-align: center;
+    padding: 28px 0 44px;
+    border-top: 1px solid var(--border);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    opacity: 0.5;
+    text-transform: uppercase;
+  }
+
+  #fileInput { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo-wrap">
+      <div class="logo">
+        <span class="logo-accent">VOIX</span>
+        <div class="logo-dot"></div>
+      </div>
+      <div class="tagline">Audio Transcription · Groq Whisper · Free</div>
+    </div>
+    <div class="groq-badge">
+      <div class="groq-badge-dot"></div>
+      Free via Groq
+    </div>
+  </header>
+
+  <!-- API Key -->
+  <div class="api-section">
+    <div class="api-top">
+      <span class="api-label">Groq Key</span>
+      <input type="password" class="api-input" id="apiKey"
+             placeholder="gsk_···" autocomplete="off" />
+      <div class="api-status" id="apiStatus"></div>
+    </div>
+    <div class="api-hint">
+      Free API key at <a href="https://console.groq.com" target="_blank">console.groq.com</a>
+      — no credit card required
+    </div>
+  </div>
+
+  <!-- Drop Zone -->
+  <div class="drop-zone" id="dropZone">
+    <div class="waveform-bars" id="waveformBars">
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      <div class="bar"></div>
+    </div>
+    <div class="drop-title">Drop your audio here</div>
+    <div class="drop-sub">or click to browse your files</div>
+    <div class="drop-formats">
+      <span class="format-tag">MP3</span>
+      <span class="format-tag">M4A</span>
+      <span class="format-tag">WAV</span>
+      <span class="format-tag">OGG</span>
+      <span class="format-tag">FLAC</span>
+    </div>
+    <input type="file" id="fileInput"
+           accept=".mp3,.m4a,.wav,.ogg,.flac,audio/*">
+  </div>
+
+  <!-- File Preview -->
+  <div class="file-preview" id="filePreview">
+    <div class="file-icon">
+      <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    </div>
+    <div class="file-info">
+      <div class="file-name" id="fileName">—</div>
+      <div class="file-size" id="fileSize">—</div>
+    </div>
+    <button class="file-remove" id="fileRemove">
+      <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.5" fill="none">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Error -->
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- Button -->
+  <button class="btn-transcribe" id="btnTranscribe" disabled>
+    Transcribe Audio
+  </button>
+
+  <!-- Progress -->
+  <div class="progress-section" id="progressSection">
+    <div class="progress-header">
+      <span class="progress-label">Processing</span>
+      <span class="progress-pct" id="progressPct">0%</span>
+    </div>
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-msg" id="progressMsg">Preparing<span class="dots"></span></div>
+  </div>
+
+  <!-- Result -->
+  <div class="result-section" id="resultSection">
+    <div class="result-header">
+      <div class="result-title">Transcription</div>
+      <div class="result-meta">
+        <span class="meta-pill lang" id="langPill">—</span>
+        <span class="meta-pill" id="chunksPill">—</span>
+      </div>
+    </div>
+    <div class="result-box" id="resultBox"></div>
+    <div class="download-row">
+      <button class="btn-download" id="btnTxt">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Download TXT
+      </button>
+      <button class="btn-download pdf" id="btnPdf">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15v-2h6v2"/><path d="M12 13v5"/></svg>
+        Download PDF
+      </button>
+      <button class="btn-new" id="btnNew">
+        <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.5" fill="none">
+          <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
+        </svg>
+        New File
+      </button>
+    </div>
+  </div>
+
+</div>
+<footer>VOIX · Local · Private · Powered by Groq Whisper · Free</footer>
+
+<script>
+  let selectedFile = null;
+  let lastResult = null;
+
+  const $ = id => document.getElementById(id);
+  const apiKeyInput = $('apiKey');
+  const apiStatus = $('apiStatus');
+  const dropZone = $('dropZone');
+  const fileInput = $('fileInput');
+  const filePreview = $('filePreview');
+  const fileName = $('fileName');
+  const fileSize = $('fileSize');
+  const fileRemove = $('fileRemove');
+  const errorBox = $('errorBox');
+  const btnTranscribe = $('btnTranscribe');
+  const progressSection = $('progressSection');
+  const progressFill = $('progressFill');
+  const progressPct = $('progressPct');
+  const progressMsg = $('progressMsg');
+  const resultSection = $('resultSection');
+  const resultBox = $('resultBox');
+  const langPill = $('langPill');
+  const chunksPill = $('chunksPill');
+  const btnTxt = $('btnTxt');
+  const btnPdf = $('btnPdf');
+  const btnNew = $('btnNew');
+  const waveformBars = $('waveformBars');
+
+  // Groq keys start with gsk_
+  apiKeyInput.addEventListener('input', () => {
+    const v = apiKeyInput.value.trim();
+    const valid = v.startsWith('gsk_') && v.length > 10;
+    apiStatus.className = 'api-status' + (valid ? ' active' : '');
+    updateBtn();
+  });
+
+  function updateBtn() {
+    btnTranscribe.disabled = !(apiKeyInput.value.trim().length > 6 && selectedFile);
+  }
+
+  // Drag & drop
+  dropZone.addEventListener('click', () => fileInput.click());
+
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+
+  dropZone.addEventListener('dragleave', e => {
+    if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove('drag-over');
+  });
+
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['mp3','m4a','wav','ogg','flac','webm'].includes(ext)) {
+      showError('Please upload MP3, M4A, WAV, OGG, or FLAC.');
+      return;
+    }
+    hideError();
+    selectedFile = file;
+    fileName.textContent = file.name;
+    fileSize.textContent = formatSize(file.size);
+    filePreview.classList.add('show');
+    updateBtn();
+  }
+
+  fileRemove.addEventListener('click', () => {
+    selectedFile = null;
+    fileInput.value = '';
+    filePreview.classList.remove('show');
+    updateBtn();
+  });
+
+  // Transcribe
+  btnTranscribe.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    const apiKey = apiKeyInput.value.trim();
+    if (!apiKey) { showError('Please enter your Groq API key.'); return; }
+
+    hideError();
+    hideResult();
+    btnTranscribe.disabled = true;
+    btnTranscribe.innerHTML = '<span class="spinner"></span>Transcribing…';
+    progressSection.classList.add('show');
+    waveformBars.classList.add('processing');
+
+    // Fake progress
+    let pct = 0;
+    const steps = [
+      { target: 20, msg: 'Converting audio format' },
+      { target: 45, msg: 'Uploading to Groq Whisper' },
+      { target: 75, msg: 'Transcribing speech' },
+      { target: 90, msg: 'Detecting language' },
+    ];
+    let si = 0;
+    const timer = setInterval(() => {
+      if (si < steps.length) {
+        if (pct < steps[si].target) {
+          pct++;
+          setProgress(pct, steps[si].msg);
+        } else si++;
+      }
+    }, 180);
+
+    try {
+      const fd = new FormData();
+      fd.append('audio', selectedFile);
+
+      const res = await fetch('/api/transcribe', {
+        method: 'POST',
+        headers: { 'X-API-Key': apiKey },
+        body: fd
+      });
+
+      clearInterval(timer);
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      setProgress(100, 'Done!');
+      await sleep(300);
+
+      const data = await res.json();
+      lastResult = data;
+      showResult(data);
+    } catch (e) {
+      clearInterval(timer);
+      showError(e.message);
+    } finally {
+      waveformBars.classList.remove('processing');
+      progressSection.classList.remove('show');
+      btnTranscribe.innerHTML = 'Transcribe Audio';
+      updateBtn();
+    }
+  });
+
+  function showResult(data) {
+    resultBox.textContent = data.transcription;
+    langPill.textContent = data.language || 'Unknown';
+    chunksPill.textContent = data.chunks === 1 ? '1 segment' : `${data.chunks} segments`;
+    resultSection.classList.add('show');
+  }
+
+  function hideResult() { resultSection.classList.remove('show'); }
+
+  function setProgress(p, msg) {
+    progressFill.style.width = p + '%';
+    progressPct.textContent = p + '%';
+    if (msg) progressMsg.innerHTML = msg + (p < 100 ? '<span class="dots"></span>' : '');
+  }
+
+  btnTxt.addEventListener('click', async () => {
+    if (!lastResult) return;
+    try {
+      const res = await fetch('/api/download/txt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcription: lastResult.transcription, filename: lastResult.filename })
+      });
+      if (!res.ok) throw new Error('Download failed');
+      triggerDownload(await res.blob(), stem(lastResult.filename) + '_transcription.txt');
+    } catch(e) { showError(e.message); }
+  });
+
+  btnPdf.addEventListener('click', async () => {
+    if (!lastResult) return;
+    try {
+      const res = await fetch('/api/download/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcription: lastResult.transcription, filename: lastResult.filename, language: lastResult.language })
+      });
+      if (!res.ok) throw new Error('Download failed');
+      triggerDownload(await res.blob(), stem(lastResult.filename) + '_transcription.pdf');
+    } catch(e) { showError(e.message); }
+  });
+
+  btnNew.addEventListener('click', () => {
+    selectedFile = null; lastResult = null;
+    fileInput.value = '';
+    filePreview.classList.remove('show');
+    hideResult(); hideError(); updateBtn();
+  });
+
+  function triggerDownload(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function formatSize(b) {
+    return b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB';
+  }
+
+  function stem(f) { return f ? f.replace(/\.[^.]+$/, '') : 'audio'; }
+  function showError(m) { errorBox.textContent = m; errorBox.classList.add('show'); }
+  function hideError() { errorBox.classList.remove('show'); }
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
