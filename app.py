@@ -1,4 +1,12 @@
+
 import os
+
+# Create project structure
+os.makedirs('/home/user/voix-transcription/templates', exist_ok=True)
+os.makedirs('/home/user/voix-transcription/static', exist_ok=True)
+
+# 1. Create app.py with environment variable for API key
+app_py = import os
 import json
 import subprocess
 import tempfile
@@ -26,11 +34,18 @@ OUTPUT_FOLDER.mkdir(exist_ok=True)
 GROQ_API_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 GROQ_MODEL = "whisper-large-v3"
 
+# 🔐 Load API key from environment variable
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    print("⚠️  WARNING: GROQ_API_KEY environment variable not set!")
+    print("   Set it with: export GROQ_API_KEY=your_key_here")
+    print("   Or create a .env file")
+
 # ── Locate ffmpeg on Windows or Unix ─────────────────────────
 def find_ffmpeg():
     # Hardcoded Windows path (confirmed location)
-    hardcoded = r"C:\ffmpeg\bin\ffmpeg.exe"
-    hardcoded_probe = r"C:\ffmpeg\bin\ffprobe.exe"
+    hardcoded = r"C:\\ffmpeg\\bin\\ffmpeg.exe"
+    hardcoded_probe = r"C:\\ffmpeg\\bin\\ffprobe.exe"
     if Path(hardcoded).exists():
         return hardcoded, hardcoded_probe
 
@@ -44,17 +59,14 @@ def find_ffmpeg():
 FFMPEG, FFPROBE = find_ffmpeg()
 
 if not FFMPEG:
-    print("\n⚠️  ffmpeg not found. Please set FFMPEG_PATH in this script or add ffmpeg to PATH.\n")
-    # Fallback — will raise a clear error at runtime
+    print("\\n⚠️  ffmpeg not found. Please set FFMPEG_PATH in this script or add ffmpeg to PATH.\\n")
     FFMPEG = "ffmpeg"
     FFPROBE = "ffprobe"
 else:
     print(f"✓ ffmpeg found: {FFMPEG}")
 
-# Groq limit: 25MB per file. We chunk at 20MB to be safe.
-# At ~128kbps MP3, 20MB ≈ ~20 minutes of audio
 CHUNK_SIZE_MB = 20
-CHUNK_DURATION_SEC = 18 * 60  # 18 minutes per chunk (safe margin)
+CHUNK_DURATION_SEC = 18 * 60  # 18 minutes per chunk
 
 ALLOWED_EXTENSIONS = {'.mp3', '.m4a', '.wav', '.ogg', '.flac', '.webm'}
 
@@ -133,7 +145,7 @@ def transcribe_chunk(chunk_path: str, api_key: str,
         }
         data = {
             "model": GROQ_MODEL,
-            "response_format": "verbose_json",  # gives us language detection
+            "response_format": "verbose_json",
             "temperature": 0,
         }
         response = requests.post(
@@ -190,9 +202,9 @@ def create_pdf(transcription: str, filename: str, language: str) -> str:
     story.append(Paragraph(f"Detected Language: {language.title()}", meta_style))
     story.append(Spacer(1, 0.4*cm))
 
-    for para in transcription.strip().split('\n\n'):
+    for para in transcription.strip().split('\\n\\n'):
         if para.strip():
-            safe = para.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br/>')
+            safe = para.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('\\n', '<br/>')
             story.append(Paragraph(safe, body_style))
             story.append(Spacer(1, 0.15*cm))
 
@@ -207,9 +219,8 @@ def index():
 
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe():
-    api_key = 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
-    if not api_key:
-        return jsonify({"error": "Missing Groq API key"}), 401
+    if not GROQ_API_KEY:
+        return jsonify({"error": "Server configuration error: API key not set"}), 500
 
     if 'audio' not in request.files:
         return jsonify({"error": "No audio file provided"}), 400
@@ -224,7 +235,6 @@ def transcribe():
     file.save(upload_path)
 
     chunk_paths = []
-    converted_paths = []
 
     try:
         chunk_paths = split_audio(upload_path)
@@ -234,12 +244,12 @@ def transcribe():
         detected_language = "unknown"
 
         for i, chunk_path in enumerate(chunk_paths):
-            result = transcribe_chunk(chunk_path, api_key, i, total_chunks)
+            result = transcribe_chunk(chunk_path, GROQ_API_KEY, i, total_chunks)
             transcriptions.append(result["text"])
             if i == 0:
                 detected_language = result["language"]
 
-        full_text = "\n\n".join(transcriptions)
+        full_text = "\\n\\n".join(transcriptions)
 
         return jsonify({
             "transcription": full_text,
@@ -296,9 +306,9 @@ def download_txt():
 
 
 if __name__ == '__main__':
-    print("\n🎙️  VOIX — Groq Whisper Transcription Server")
+    print("\\n🎙️  VOIX — Groq Whisper Transcription Server")
     print("=" * 44)
     print("  Open: http://localhost:5000")
     print("  Free API key: https://console.groq.com")
-    print("=" * 44 + "\n")
+    print("=" * 44 + "\\n")
     app.run(debug=False, host='0.0.0.0', port=5000)
